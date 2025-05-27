@@ -26,21 +26,28 @@ check_cmd() {
 # Kerberos ticket check / Kerberosチケット確認
 check_kerberos_ticket() {
   print_section "Kerberos Ticket (klist)"
+
   if klist 2>&1 | grep -q 'Default principal'; then
+    echo -e "${GREEN}Kerberos ticket found for current user:${RESET}"
     klist
-  else
-    echo -e "${YELLOW}No default Kerberos ticket via klist. Scanning available ticket caches...${RESET}"
-    local found_ticket=0
-    for cache in /tmp/krb5cc_*; do
-      if [[ -r "$cache" ]]; then
-        echo -e "${GREEN}Found ticket cache: $cache${RESET}"
-        klist -c "$cache"
-        found_ticket=1
-      fi
-    done
-    if [[ $found_ticket -eq 0 ]]; then
-      echo -e "${RED}No valid Kerberos ticket found.${RESET}"
+    return
+  fi
+
+  echo -e "${YELLOW}No Kerberos ticket found for current user.${RESET}"
+
+  # logname でログインユーザを取得
+  if login_user=$(logname 2>/dev/null); then
+    echo -e "${YELLOW}Checking Kerberos ticket for login user: $login_user${RESET}"
+    if sudo -u "$login_user" klist 2>&1 | grep -q 'Default principal'; then
+      echo -e "${GREEN}Kerberos ticket found for $login_user:${RESET}"
+      sudo -u "$login_user" klist
+    else
+      echo -e "${RED}No valid Kerberos ticket found for $login_user.${RESET}"
+      echo -e "${YELLOW}Hint: Try running 'kinit' as that user.${RESET}"
     fi
+  else
+    echo -e "${RED}Could not determine login user using logname.${RESET}"
+    echo -e "${YELLOW}Hint: Ensure you're running this in a proper login session.${RESET}"
   fi
 }
 
